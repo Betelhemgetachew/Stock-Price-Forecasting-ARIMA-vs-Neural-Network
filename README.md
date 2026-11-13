@@ -1,48 +1,69 @@
-# Stock Market Prediction - MTH1060 Capstone Project
-![Matlab Image](matlab.png)
-## Introduction
-Machine learning models in MATLAB that predicts stock market prices based on historical data. 
+# Stock Price Forecasting: ARIMA vs Neural Network
 
-They utilise time series analysis and neural networks to evaluate the effectiveness in price prediction.
+**Can ARIMA or a neural network predict tomorrow's closing price better than simply repeating today's?**
 
-## Data Acquisition
-Data was obtained from Yahoo Finance. The data spans from 1st July 2014 to 28th June 2024. The data is in the following general form:
+For 20 large companies over 10 years of daily prices: **no.** Once every model is restricted to information available the day before, the naive forecast ("tomorrow = today") is the most accurate, and both models call the direction of moves about as often as a coin flip.
 
-```csv
-Date,Open,High,Low,Close,Adj Close,Volume
-2014-07-01,23.3799991607666,23.517499923706055,23.282499313354492,23.3799991607666,20.68042755126953,152892000
-2014-07-02,23.467500686645508,23.514999389648438,23.272499084472656,23.3700008392334,20.671592712402344,113860000
-2014-07-03,23.417499542236328,23.524999618530273,23.299999237060547,23.50749969482422,20.793209075927734,91567200
+![MAPE compared with the naive forecast](results/mape_vs_naive.png)
+
+## Results
+
+One-day-ahead forecasts on the test period (late December 2021 – June 2024, about 629 trading days per company):
+
+| Model | Average error (MAPE) | Direction called correctly | Beats naive |
+|---|---|---|---|
+| Naive (yesterday's close) | **1.51%** | – | – |
+| ARIMA(p, 1, q) on log prices | 1.54% | 50.1% | 0 of 20 companies |
+| Neural network (40 hidden nodes) on past returns | 1.59% | 50.8% | 0 of 20 companies |
+
+A July 2024 check on unseen data gives the same order (naive 1.46%, ARIMA 1.47%, neural network 1.50%).
+
+The forecasts look accurate on a chart, but they are essentially the actual price shifted by one day:
+
+![Microsoft forecasts, last 60 test days](results/microsoft_forecasts.png)
+
+## Why the original version looked much better
+
+This project began as a group capstone in MATLAB (see [`original_matlab/`](original_matlab/)), where the neural network appeared extremely accurate. Rebuilding it showed why: its inputs were **the same day's** Open, High, Low, Volume and **Close**, and it was asked to predict that same day's Close. The scaling also used the whole dataset, test years included.
+
+Reproducing that setup in the notebook drops the error to 0.91%, "beating" naive for 19 of 20 companies, because the answer is one of the inputs. With only past information, that advantage disappears.
+
+## Method
+
+- **Data:** daily prices for 20 companies from Yahoo Finance, July 2014 – June 2024 (`data/`), plus July 2024 for validation (`validation/`).
+- **Split:** first 75% of days for training, last 25% for testing, in date order. Scalers are fitted on training days only.
+- **Naive baseline:** tomorrow's close = today's close.
+- **ARIMA:** ARIMA(p, 1, q) on log prices, p and q from 0 to 2 chosen by AIC on training data, then one-step-ahead forecasts with parameters fixed.
+- **Neural network:** scikit-learn `MLPRegressor`, one hidden layer of 40 nodes, Adam, early stopping. Inputs are the previous 10 daily log returns; the output is the next day's return, converted back to a price.
+- **Metrics:** mean absolute percentage error (prices are in different currencies and scales), and the share of days the up/down move was called correctly.
+
+## Data issues found
+
+- **Two validation files are a different listing from their training files.** Siemens drops 74% and L'Oreal jumps 355% overnight between the two files, so they are excluded from the July 2024 check.
+- **East Africa Metals** is very thinly traded: its price does not move on 39% of days.
+
+## Run it
+
+```bash
+pip install -r requirements.txt
+jupyter notebook stock_forecasting.ipynb
 ```
 
-## Data Preprocessing
-Data was imported into MatLab in bulk and stored in an array. This enables the use of iteration and control structures to access the data. Warnings are suppressed for cleaner output and if there are any missing values they are pointed out.
+The full notebook runs in under a minute.
 
-This allows for missing values to be dropped in order to ensure that operations are not skewed or curtailed by this data.
+## Project structure
 
-Furthermore, data is normalized between the range of 0 and 1 in order for our Time Series Analysis and Neural Network models to be able to work with our data. Only numerical columns are normalized. The column `date` is not affected in any way.
+```
+├── stock_forecasting.ipynb   # Full analysis (Python)
+├── data/                     # Daily prices, July 2014 – June 2024, 20 companies
+├── validation/               # July 2024
+├── results/                  # Charts used in this README
+├── original_matlab/          # Original group version: MATLAB code, results, report
+└── requirements.txt
+```
 
-## Time Series Analysis
+## Credits
 
-## Neural Networks
-We decided to use a Neural Network that:
+The original version was a group project for MTH 1060 (Analytical Computational Foundation) at USIU-Africa, Group 5: Misati Nyambane, Hoziyana Rachael and Betelhem Kebede, built in MATLAB. The Python analysis in this repository is my independent re-implementation.
 
-- Has 40 hidden nodes
-- Trains for a maximum of 1000 epochs
-- Uses the adam optimizer
-- Utilises 75% of the data to train
-- Utilises 25% of the data to test
-- Uses the Mean Squared Error to test the error of the results
-
-
-## Model Comparison and Analysis
-
-### Time Series Analysis
-
-
-### Neural Network
-On **training** data the model is extremely accurate. The error is exceedingly small and when visualised the points almost always overlap.
-
-On **testing** data the model has diverse behaviours. On one end for companies that experienced a recent boom due to AI the model underfits like Microsoft. On the other hand, for companies that deal with cosmetic products or food or a diverse range of products the model is pretty accurate all round.
-
-On **validation** data the model predicts companies that experienced an AI boom even better since the time span is shorter. For other companies the accuracy either stagnates generally or decreases.
+**Author:** Betelhem Getachew Kebede, Data Science & Analytics, USIU-Africa
