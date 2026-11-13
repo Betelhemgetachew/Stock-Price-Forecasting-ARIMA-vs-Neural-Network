@@ -4,7 +4,3 @@ temp
 *.asv
 *~
 ~*
-
-.ipynb_checkpoints/
-__pycache__/
-.venv/
